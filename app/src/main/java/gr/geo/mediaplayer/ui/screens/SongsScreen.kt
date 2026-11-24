@@ -66,7 +66,7 @@ import gr.geo.mediaplayer.ui.SearchField
 import gr.geo.mediaplayer.ui.SongMenu
 import gr.geo.mediaplayer.ui.SongRow
 
-private val sortLabels = listOf("Τίτλος (Α-Ω)", "Καλλιτέχνης", "Πιο πρόσφατα", "Διάρκεια")
+val sortLabels = listOf("Τίτλος (Α-Ω)", "Καλλιτέχνης", "Πιο πρόσφατα", "Διάρκεια")
 
 fun sortSongs(songs: List<Song>, sort: Int): List<Song> = when (sort) {
     1 -> songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.artist })

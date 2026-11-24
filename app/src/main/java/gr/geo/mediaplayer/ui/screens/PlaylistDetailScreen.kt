@@ -58,6 +58,23 @@ import gr.geo.mediaplayer.ui.EmptyState
 import gr.geo.mediaplayer.ui.SearchField
 import gr.geo.mediaplayer.ui.SongMenu
 import gr.geo.mediaplayer.ui.SongRow
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import gr.geo.mediaplayer.ui.Artwork
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -238,39 +255,123 @@ fun SongPickerDialog(
     onConfirm: (List<Long>) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    var sort by remember { mutableIntStateOf(2) } // newest first by default
     var chosen by remember { mutableStateOf(setOf<Long>()) }
-    val list = remember(all, query) {
-        if (query.isBlank()) all else all.filter { it.title.contains(query, true) || it.artist.contains(query, true) }
+    val list = remember(all, query, sort) {
+        val filtered = if (query.isBlank()) all
+        else all.filter { it.title.contains(query, true) || it.artist.contains(query, true) || it.album.contains(query, true) }
+        sortSongs(filtered, sort)
     }
-    AlertDialog(
+    val dateFmt = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Προσθήκη τραγουδιών") },
-        text = {
-            Column {
-                SearchField(query, { query = it }, "Αναζήτηση")
-                Spacer(Modifier.height(8.dp))
-                LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(list, key = { it.id }) { s ->
-                        val inList = alreadyIn.contains(s.id)
-                        val isSel = chosen.contains(s.id) || inList
-                        val toggle: () -> Unit = {
-                            if (!inList) chosen = if (chosen.contains(s.id)) chosen - s.id else chosen + s.id
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(AppColors.Background)
+                .systemBarsPadding()
+        ) {
+            // ---- top bar ----
+            Row(
+                Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, "Άκυρο", tint = Color.White)
+                }
+                Text(
+                    "Προσθήκη τραγουδιών",
+                    style = MaterialTheme.typography.titleLarge, color = Color.White,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "Προσθήκη (${chosen.size})",
+                    color = if (chosen.isEmpty()) AppColors.TextFaint else Color.White,
+                    fontSize = 15.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (chosen.isEmpty()) AppColors.Surface else AppColors.Accent)
+                        .clickable(enabled = chosen.isNotEmpty()) { onConfirm(chosen.toList()) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+
+            SearchField(query, { query = it }, "Αναζήτηση", Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+
+            // ---- sort chips ----
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(2, 0, 1, 3).forEach { i ->
+                    val sel = i == sort
+                    Text(
+                        sortLabels[i],
+                        color = Color.White, fontSize = 14.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(if (sel) AppColors.Accent else AppColors.SurfaceStrong)
+                            .clickable { sort = i }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
+            // ---- select all visible ----
+            val selectable = list.filter { !alreadyIn.contains(it.id) }
+            val allSel = selectable.isNotEmpty() && selectable.all { chosen.contains(it.id) }
+            val toggleAll: () -> Unit = {
+                chosen = if (allSel) chosen - selectable.map { it.id }.toSet()
+                else chosen + selectable.map { it.id }
+            }
+            Row(
+                Modifier.fillMaxWidth().clickable(onClick = toggleAll).padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircleCheck(allSel, toggleAll)
+                Spacer(Modifier.width(16.dp))
+                Text("Επιλογή όλων (${list.size})", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            }
+
+            LazyColumn(Modifier.weight(1f)) {
+                items(list, key = { it.id }) { s ->
+                    val inList = alreadyIn.contains(s.id)
+                    val isSel = chosen.contains(s.id) || inList
+                    val toggle: () -> Unit = {
+                        if (!inList) chosen = if (chosen.contains(s.id)) chosen - s.id else chosen + s.id
+                    }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(if (isSel && !inList) AppColors.Surface else Color.Transparent)
+                            .clickable(onClick = toggle)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircleCheck(isSel, toggle)
+                        Spacer(Modifier.width(12.dp))
+                        Artwork(s.uri, size = 48.dp, corner = 10.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                s.title, color = if (inList) AppColors.TextFaint else Color.White,
+                                fontSize = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                lineHeight = 20.sp
+                            )
+                            Text(
+                                if (inList) "Υπάρχει ήδη στη playlist"
+                                else "${s.artist} · ${formatDuration(s.durationMs)} · ${dateFmt.format(Date(s.dateAddedSec * 1000))}",
+                                color = AppColors.TextDim, fontSize = 13.sp,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
                         }
-                        SongRow(
-                            title = s.title, subtitle = if (inList) "Υπάρχει ήδη" else s.artist,
-                            artUri = s.uri, isCurrent = false,
-                            leading = { CircleCheck(isSel) { toggle() } },
-                            onClick = { toggle() }
-                        )
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(chosen.toList()) }, enabled = chosen.isNotEmpty()) {
-                Text("Προσθήκη (${chosen.size})")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Άκυρο") } },
-    )
+        }
+    }
 }
