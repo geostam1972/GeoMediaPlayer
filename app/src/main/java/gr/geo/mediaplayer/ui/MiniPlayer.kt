@@ -40,7 +40,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -71,6 +73,11 @@ fun MiniPlayer(onOpen: () -> Unit, onQueue: () -> Unit, modifier: Modifier = Mod
     )
 
     var dragX by remember { mutableFloatStateOf(0f) }
+    val songUri = s.mediaId?.toLongOrNull()?.let { MediaRepository.songById(it)?.uri }
+    val colors = rememberArtColors(songUri)
+    val barBrush = Brush.horizontalGradient(
+        listOf(lerp(colors.top, colors.accent, 0.6f), lerp(colors.top, colors.accent, 0.3f))
+    )
 
     Box(modifier.fillMaxWidth().height(72.dp)) {
         Column(
@@ -80,7 +87,7 @@ fun MiniPlayer(onOpen: () -> Unit, onQueue: () -> Unit, modifier: Modifier = Mod
                 .height(64.dp)
                 .align(Alignment.CenterStart)
                 .clip(RoundedCornerShape(32.dp))
-                .background(AppColors.MiniPlayer)
+                .background(barBrush)
                 .clickable(onClick = onOpen)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
@@ -128,7 +135,6 @@ fun MiniPlayer(onOpen: () -> Unit, onQueue: () -> Unit, modifier: Modifier = Mod
         }
 
         // Spinning vinyl disc with the cover in the middle
-        val songUri = s.mediaId?.toLongOrNull()?.let { MediaRepository.songById(it)?.uri }
         Box(
             Modifier
                 .size(72.dp)

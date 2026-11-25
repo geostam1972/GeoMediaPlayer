@@ -54,7 +54,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import gr.geo.mediaplayer.ui.loadThumb
+import gr.geo.mediaplayer.ui.rememberArtColors
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -106,6 +116,29 @@ fun NowPlayingScreen(nav: NavHostController) {
     var swipeX by remember { mutableFloatStateOf(0f) }
     var swipeY by remember { mutableFloatStateOf(0f) }
 
+    val colors = rememberArtColors(song?.uri)
+    val context = LocalContext.current
+    var bgBmp by remember { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(song?.uri) { bgBmp = loadThumb(context, song?.uri, 256) }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(colors.top, colors.bottom)))
+    ) {
+        // blurred cover behind everything (Android 12+)
+        bgBmp?.let {
+            Image(
+                it.asImageBitmap(), null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().blur(80.dp).graphicsLayer { alpha = 0.45f }
+            )
+        }
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(listOf(Color.Transparent, colors.bottom.copy(alpha = 0.9f)))
+            )
+        )
     Column(
         Modifier
             .fillMaxSize()
@@ -127,7 +160,7 @@ fun NowPlayingScreen(nav: NavHostController) {
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("ΤΩΡΑ ΠΑΙΖΕΙ", color = AppColors.TextDim, fontSize = 12.sp, letterSpacing = 2.sp)
                 if (sleepEnd != 0L) {
-                    Text("Ύπνος σε ${formatDuration(sleepLeft)}", color = AppColors.Accent, fontSize = 12.sp)
+                    Text("Ύπνος σε ${formatDuration(sleepLeft)}", color = colors.accent, fontSize = 12.sp)
                 }
             }
             IconButton(onClick = { nav.navigate(Routes.QUEUE) }) {
@@ -204,7 +237,7 @@ fun NowPlayingScreen(nav: NavHostController) {
                 },
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
-                    activeTrackColor = AppColors.Accent,
+                    activeTrackColor = colors.accent,
                     inactiveTrackColor = Color.White.copy(alpha = 0.2f)
                 ),
                 modifier = Modifier.weight(1f)
@@ -230,7 +263,7 @@ fun NowPlayingScreen(nav: NavHostController) {
             IconButton(onClick = { PlayerConnection.toggleShuffle() }) {
                 Icon(
                     Icons.Filled.Shuffle, "Τυχαία σειρά",
-                    tint = if (s.shuffle) AppColors.Accent else AppColors.TextFaint,
+                    tint = if (s.shuffle) colors.accent else AppColors.TextFaint,
                     modifier = Modifier.size(30.dp)
                 )
             }
@@ -241,14 +274,14 @@ fun NowPlayingScreen(nav: NavHostController) {
                 Modifier
                     .size(86.dp)
                     .clip(CircleShape)
-                    .background(AppColors.SurfaceStrong)
+                    .background(colors.accent)
                     .clickable { PlayerConnection.togglePlay() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     if (s.isPlaying) "Παύση" else "Αναπαραγωγή",
-                    tint = Color.White, modifier = Modifier.size(52.dp)
+                    tint = colors.onAccent, modifier = Modifier.size(52.dp)
                 )
             }
             IconButton(onClick = { PlayerConnection.next() }, modifier = Modifier.size(60.dp)) {
@@ -262,7 +295,7 @@ fun NowPlayingScreen(nav: NavHostController) {
                         Player.REPEAT_MODE_ALL -> "Επανάληψη όλων"
                         else -> "Χωρίς επανάληψη"
                     },
-                    tint = if (s.repeatMode == Player.REPEAT_MODE_OFF) AppColors.TextFaint else AppColors.Accent,
+                    tint = if (s.repeatMode == Player.REPEAT_MODE_OFF) AppColors.TextFaint else colors.accent,
                     modifier = Modifier.size(30.dp)
                 )
             }
@@ -277,9 +310,11 @@ fun NowPlayingScreen(nav: NavHostController) {
         ) {
             ToolButton(Icons.AutoMirrored.Filled.PlaylistAdd, "Σε playlist", enabled = songId != null) { addToPlaylist = true }
             ToolButton(Icons.Filled.Equalizer, "Ισοσταθμιστής") { nav.navigate(Routes.EQ) }
-            ToolButton(Icons.Filled.Alarm, "Χρονόμετρο", highlighted = sleepEnd != 0L) { showSleep = true }
+            ToolButton(Icons.Filled.Alarm, "Χρονόμετρο", highlighted = sleepEnd != 0L, accent = colors.accent) { showSleep = true }
             ToolButton(Icons.AutoMirrored.Filled.QueueMusic, "Ουρά") { nav.navigate(Routes.QUEUE) }
         }
+    }
+
     }
 
     if (showSleep) SleepTimerDialog(active = sleepEnd != 0L) { showSleep = false }
@@ -292,6 +327,7 @@ private fun ToolButton(
     label: String,
     enabled: Boolean = true,
     highlighted: Boolean = false,
+    accent: Color = AppColors.Accent,
     onClick: () -> Unit,
 ) {
     Column(
@@ -303,7 +339,7 @@ private fun ToolButton(
     ) {
         val tint = when {
             !enabled -> AppColors.TextFaint
-            highlighted -> AppColors.Accent
+            highlighted -> accent
             else -> AppColors.TextDim
         }
         Icon(icon, label, tint = tint, modifier = Modifier.size(28.dp))

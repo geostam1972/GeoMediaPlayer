@@ -44,6 +44,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,6 +86,7 @@ fun SongsScreen(nav: NavHostController) {
     var sort by remember { mutableIntStateOf(LibraryStore.getInt("sort", 0)) }
     var sortMenu by remember { mutableStateOf(false) }
 
+    var view by rememberSaveable { mutableIntStateOf(0) } // 0 songs, 1 albums, 2 artists
     var selecting by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(setOf<Long>()) }
     var addToPlaylistIds by remember { mutableStateOf<List<Long>?>(null) }
@@ -140,7 +142,8 @@ fun SongsScreen(nav: NavHostController) {
                     Icon(Icons.Filled.Settings, "Ρυθμίσεις", tint = Color.White, modifier = Modifier.size(28.dp))
                 }
             }
-            Row(
+            LibraryViewChips(view) { view = it }
+            if (view == 0) Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -166,7 +169,7 @@ fun SongsScreen(nav: NavHostController) {
                     Icon(Icons.Filled.Checklist, "Επιλογή", tint = Color.White)
                 }
             }
-            if (songs.isNotEmpty()) {
+            if (view == 0 && songs.isNotEmpty()) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -183,6 +186,7 @@ fun SongsScreen(nav: NavHostController) {
 
         Box(Modifier.weight(1f)) {
             when {
+                !selecting && view != 0 -> LibraryGrid(view, query, nav)
                 loading && allSongs.isEmpty() -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 songs.isEmpty() -> EmptyState(
                     Icons.Filled.MusicOff,

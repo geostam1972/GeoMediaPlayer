@@ -73,4 +73,5 @@ dependencies {
     implementation("io.coil-kt:coil-gif:2.7.0")
 
     implementation("sh.calvin.reorderable:reorderable:2.4.3")
+    implementation("androidx.palette:palette-ktx:1.0.0")
 }

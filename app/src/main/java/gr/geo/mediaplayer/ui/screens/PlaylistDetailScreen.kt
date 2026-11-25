@@ -94,15 +94,19 @@ fun PlaylistDetailScreen(nav: NavHostController, kind: String, playlistId: Long)
         "recent" -> "Πρόσφατα παιγμένα"
         "most" -> "Πιο παιγμένα"
         "daily" -> "Ημερήσια playlist"
+        "album" -> all.firstOrNull { it.albumId == playlistId }?.album?.ifBlank { null } ?: "Άλμπουμ"
+        "artist" -> all.firstOrNull { artistId(it.artist) == playlistId }?.artist ?: "Καλλιτέχνης"
         else -> userPlaylist?.name ?: "Playlist"
     }
-    val songs: List<Song> = remember(kind, all, favIds, recent, counts, userPlaylist) {
+    val songs: List<Song> = remember(kind, playlistId, all, favIds, recent, counts, userPlaylist) {
         when (kind) {
             "fav" -> SmartLists.favorites(all, favIds)
             "added" -> SmartLists.recentlyAdded(all)
             "recent" -> SmartLists.recentlyPlayed(all, recent)
             "most" -> SmartLists.mostPlayed(all, counts)
             "daily" -> SmartLists.daily(all)
+            "album" -> all.filter { it.albumId == playlistId }.sortedBy { it.title.lowercase() }
+            "artist" -> all.filter { artistId(it.artist) == playlistId }.sortedBy { it.title.lowercase() }
             else -> userPlaylist?.let { SmartLists.user(all, it) } ?: emptyList()
         }
     }
@@ -131,6 +135,13 @@ fun PlaylistDetailScreen(nav: NavHostController, kind: String, playlistId: Long)
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { nav.popBackStack() }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Πίσω", tint = Color.White)
+            }
+            if ((kind == "album" || kind == "artist") && songs.isNotEmpty()) {
+                Artwork(
+                    songs.first().uri, size = 64.dp,
+                    corner = if (kind == "album") 12.dp else 32.dp,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
             }
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.headlineMedium, color = Color.White, maxLines = 1)

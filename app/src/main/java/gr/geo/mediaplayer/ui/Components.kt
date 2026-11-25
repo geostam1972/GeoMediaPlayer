@@ -27,14 +27,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.border
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
+import gr.geo.mediaplayer.playback.PlayerConnection
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -88,15 +96,7 @@ fun Artwork(
     val key = "${uri}_$loadSizePx"
     var bmp by remember(key) { mutableStateOf(uri?.let { ThumbCache.get(key) }) }
     LaunchedEffect(key) {
-        if (uri == null || bmp != null || ThumbCache.isMissing(key)) return@LaunchedEffect
-        val loaded = withContext(Dispatchers.IO) {
-            runCatching {
-                context.contentResolver.loadThumbnail(uri, Size(loadSizePx, loadSizePx), null)
-            }.getOrNull()
-        }
-        if (loaded != null) {
-            ThumbCache.put(key, loaded); bmp = loaded
-        } else ThumbCache.markMissing(key)
+        if (bmp == null) bmp = loadThumb(context, uri, loadSizePx)
     }
     Box(
         modifier
@@ -116,9 +116,38 @@ fun Artwork(
             Icon(fallbackIcon, null, tint = AppColors.Accent, modifier = Modifier.size(size * 0.45f))
         }
         if (playingIndicator) {
+            val playing = PlayerConnection.state.collectAsState().value.isPlaying
             Box(Modifier.fillMaxSize().background(Color(0x99000000)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.GraphicEq, null, tint = Color.White, modifier = Modifier.size(size * 0.5f))
+                PlayingBars(animate = playing, height = size * 0.42f)
             }
+        }
+    }
+}
+
+/** Three little bars that dance while the song plays (static when paused). */
+@Composable
+fun PlayingBars(animate: Boolean, height: Dp, color: Color = Color.White) {
+    val t = rememberInfiniteTransition(label = "bars")
+    val specs = listOf(420, 560, 360)
+    val rest = listOf(0.45f, 0.85f, 0.6f)
+    Row(
+        Modifier.height(height),
+        horizontalArrangement = Arrangement.spacedBy(height * 0.14f),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        specs.forEachIndexed { i, ms ->
+            val f by t.animateFloat(
+                initialValue = 0.25f, targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(ms, easing = LinearEasing), RepeatMode.Reverse),
+                label = "bar$i"
+            )
+            Box(
+                Modifier
+                    .width(height * 0.2f)
+                    .fillMaxHeight(if (animate) f else rest[i])
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(color)
+            )
         }
     }
 }
